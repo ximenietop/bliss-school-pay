@@ -5,41 +5,48 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, CreditCard } from "lucide-react";
+import { ArrowLeft, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import logoShort from "@/assets/bliss-logo-short.png";
 
-const AdminRecargas = () => {
+const AdminPagos = () => {
   const navigate = useNavigate();
-  const [clienteId, setClienteId] = useState("");
+  const [comercioId, setComercioId] = useState("");
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const clientes = [
-    { id: "1", nombre: "Juan Pérez", correo: "juan.perez@colegiorefous.edu.co" },
-    { id: "2", nombre: "María García", correo: "maria.garcia@colegiorefous.edu.co" },
-    { id: "3", nombre: "Carlos López", correo: "carlos.lopez@colegiorefous.edu.co" },
+  const comercios = [
+    { id: "1", nombre: "Cafetería Escolar", codigo: "10001", saldo: 95000 },
+    { id: "2", nombre: "Papelería CRF", codigo: "10002", saldo: 45000 },
   ];
 
-  const handleRecarga = (e: React.FormEvent) => {
+  const handlePago = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!clienteId) {
-      toast.error("Selecciona un cliente");
+    if (!comercioId) {
+      toast.error("Selecciona un comercio");
       return;
     }
 
-    if (parseFloat(monto) <= 0) {
+    const comercio = comercios.find(c => c.id === comercioId);
+    const montoNum = parseFloat(monto);
+
+    if (montoNum <= 0) {
       toast.error("El monto debe ser mayor a cero");
+      return;
+    }
+
+    if (comercio && montoNum > comercio.saldo) {
+      toast.error("El monto excede el saldo disponible del comercio");
       return;
     }
 
     setLoading(true);
     
     setTimeout(() => {
-      toast.success("Recarga realizada exitosamente");
-      setClienteId("");
+      toast.success("Pago realizado exitosamente");
+      setComercioId("");
       setMonto("");
       setDescripcion("");
       setLoading(false);
@@ -56,7 +63,7 @@ const AdminRecargas = () => {
           </Button>
           <img src={logoShort} alt="BLISS" className="h-12" />
           <h1 className="text-2xl font-bold bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">
-            Realizar Recargas
+            Pagos a Comercios
           </h1>
         </header>
 
@@ -64,22 +71,22 @@ const AdminRecargas = () => {
         <Card className="shadow-[var(--shadow-warm)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              Cargar Saldo a Cliente
+              <DollarSign className="h-5 w-5 text-destructive" />
+              Realizar Pago/Retiro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleRecarga} className="space-y-6">
+            <form onSubmit={handlePago} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="cliente">Cliente</Label>
-                <Select value={clienteId} onValueChange={setClienteId}>
+                <Label htmlFor="comercio">Comercio</Label>
+                <Select value={comercioId} onValueChange={setComercioId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar cliente..." />
+                    <SelectValue placeholder="Seleccionar comercio..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {clientes.map((cliente) => (
-                      <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre} - {cliente.correo}
+                    {comercios.map((comercio) => (
+                      <SelectItem key={comercio.id} value={comercio.id}>
+                        {comercio.nombre} - Saldo: ${comercio.saldo.toLocaleString("es-CO")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -87,7 +94,7 @@ const AdminRecargas = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="monto">Monto a Recargar</Label>
+                <Label htmlFor="monto">Monto a Pagar</Label>
                 <Input
                   id="monto"
                   type="number"
@@ -97,9 +104,11 @@ const AdminRecargas = () => {
                   onChange={(e) => setMonto(e.target.value)}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Sugerencias: $10,000 | $20,000 | $50,000
-                </p>
+                {comercioId && (
+                  <p className="text-xs text-muted-foreground">
+                    Saldo disponible: ${comercios.find(c => c.id === comercioId)?.saldo.toLocaleString("es-CO")}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -107,7 +116,7 @@ const AdminRecargas = () => {
                 <Input
                   id="descripcion"
                   type="text"
-                  placeholder="Ej: Recarga mensual"
+                  placeholder="Ej: Retiro quincenal"
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                   required
@@ -124,33 +133,33 @@ const AdminRecargas = () => {
                   Cancelar
                 </Button>
                 <Button type="submit" variant="hero" className="flex-1" disabled={loading}>
-                  {loading ? "Procesando..." : "Realizar Recarga"}
+                  {loading ? "Procesando..." : "Realizar Pago"}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
 
-        {/* Recent Recargas */}
+        {/* Recent Pagos */}
         <Card className="mt-6 shadow-[var(--shadow-warm)]">
           <CardHeader>
-            <CardTitle className="text-lg">Recargas Recientes</CardTitle>
+            <CardTitle className="text-lg">Pagos Recientes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-accent/10 rounded-lg">
+              <div className="flex justify-between items-center p-3 bg-destructive/10 rounded-lg">
                 <div>
-                  <p className="font-medium">Juan Pérez</p>
-                  <p className="text-xs text-muted-foreground">Recarga mensual</p>
+                  <p className="font-medium">Cafetería Escolar</p>
+                  <p className="text-xs text-muted-foreground">Retiro quincenal</p>
                 </div>
-                <p className="font-bold text-accent-foreground">+$50,000</p>
+                <p className="font-bold text-destructive">-$50,000</p>
               </div>
-              <div className="flex justify-between items-center p-3 bg-accent/10 rounded-lg">
+              <div className="flex justify-between items-center p-3 bg-destructive/10 rounded-lg">
                 <div>
-                  <p className="font-medium">María García</p>
-                  <p className="text-xs text-muted-foreground">Recarga semanal</p>
+                  <p className="font-medium">Papelería CRF</p>
+                  <p className="text-xs text-muted-foreground">Retiro mensual</p>
                 </div>
-                <p className="font-bold text-accent-foreground">+$30,000</p>
+                <p className="font-bold text-destructive">-$35,000</p>
               </div>
             </div>
           </CardContent>
@@ -160,4 +169,4 @@ const AdminRecargas = () => {
   );
 };
 
-export default AdminRecargas;
+export default AdminPagos;

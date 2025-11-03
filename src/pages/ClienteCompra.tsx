@@ -84,7 +84,6 @@ const ClienteCompra = () => {
                   type="number"
                   placeholder="0"
                   min="1"
-                  step="100"
                   value={monto}
                   onChange={(e) => setMonto(e.target.value)}
                   required
