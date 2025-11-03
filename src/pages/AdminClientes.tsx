@@ -73,6 +73,16 @@ const AdminClientes = () => {
 
       if (insertError) throw insertError;
 
+      // Asignar rol de cliente
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({
+          user_id: authData.user?.id,
+          role: "cliente",
+        });
+
+      if (roleError) throw roleError;
+
       toast.success("Cliente agregado exitosamente");
       setNewCliente({ nombre: "", correo: "", password: "", saldo: "0" });
       setDialogOpen(false);

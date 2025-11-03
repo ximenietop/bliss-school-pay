@@ -32,15 +32,14 @@ const ClienteLogin = () => {
 
       if (authError) throw authError;
 
-      const { data: usuario, error: userError } = await supabase
-        .from("usuarios")
-        .select("tipo_usuario")
-        .eq("id", authData.user.id)
-        .single();
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", authData.user.id)
+        .eq("role", "cliente")
+        .maybeSingle();
 
-      if (userError) throw userError;
-
-      if (usuario.tipo_usuario !== "cliente") {
+      if (roleError || !roleData) {
         await supabase.auth.signOut();
         throw new Error("Esta cuenta no es de cliente");
       }

@@ -26,13 +26,28 @@ const ComercioLogin = () => {
 
       if (authError) throw authError;
 
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", authData.user.id)
+        .eq("role", "comercio")
+        .maybeSingle();
+
+      if (roleError || !roleData) {
+        await supabase.auth.signOut();
+        throw new Error("No tienes permisos de comercio");
+      }
+
       const { data: comercio, error: comercioError } = await supabase
         .from("comercios")
         .select("*")
         .eq("usuario_id", authData.user.id)
-        .single();
+        .maybeSingle();
 
-      if (comercioError) throw new Error("No se encontró el comercio asociado");
+      if (comercioError || !comercio) {
+        await supabase.auth.signOut();
+        throw new Error("No se encontró el comercio asociado");
+      }
 
       toast.success("¡Bienvenido!");
       navigate("/comercio/dashboard");
