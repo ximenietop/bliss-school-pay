@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import logoFull from "@/assets/bliss-logo-full.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const ComercioLogin = () => {
   const navigate = useNavigate();
@@ -17,16 +18,29 @@ const ComercioLogin = () => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulación de login - en producción conectar con Supabase Auth
-    setTimeout(() => {
-      if (correo && password === "test123") {
-        toast.success("¡Bienvenido!");
-        navigate("/comercio/dashboard");
-      } else {
-        toast.error("Correo o contraseña incorrectos");
-      }
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: correo,
+        password: password,
+      });
+
+      if (authError) throw authError;
+
+      const { data: comercio, error: comercioError } = await supabase
+        .from("comercios")
+        .select("*")
+        .eq("usuario_id", authData.user.id)
+        .single();
+
+      if (comercioError) throw new Error("No se encontró el comercio asociado");
+
+      toast.success("¡Bienvenido!");
+      navigate("/comercio/dashboard");
+    } catch (error: any) {
+      toast.error(error.message || "Correo o contraseña incorrectos");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -70,9 +84,6 @@ const ComercioLogin = () => {
             <Button type="submit" className="w-full" variant="hero" disabled={loading}>
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Usuario demo: cafeteria@bliss.com / test123
-            </p>
           </form>
         </CardContent>
       </Card>

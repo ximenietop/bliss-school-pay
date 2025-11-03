@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import logoFull from "@/assets/bliss-logo-full.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -17,16 +18,34 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulación de login - en producción conectar con Supabase Auth
-    setTimeout(() => {
-      if (correo && password === "test123") {
-        toast.success("¡Bienvenido Administrador!");
-        navigate("/admin/dashboard");
-      } else {
-        toast.error("Correo o contraseña incorrectos");
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: correo,
+        password: password,
+      });
+
+      if (authError) throw authError;
+
+      const { data: usuario, error: userError } = await supabase
+        .from("usuarios")
+        .select("tipo_usuario")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (userError) throw userError;
+
+      if (usuario.tipo_usuario !== "admin") {
+        await supabase.auth.signOut();
+        throw new Error("No tienes permisos de administrador");
       }
+
+      toast.success("¡Bienvenido Administrador!");
+      navigate("/admin/dashboard");
+    } catch (error: any) {
+      toast.error(error.message || "Correo o contraseña incorrectos");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -70,9 +89,6 @@ const AdminLogin = () => {
             <Button type="submit" className="w-full" variant="hero" disabled={loading}>
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Usuario demo: admin@bliss.com / test123
-            </p>
           </form>
         </CardContent>
       </Card>

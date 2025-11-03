@@ -1,22 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminClientes = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [clientes, setClientes] = useState([
-    { id: "1", nombre: "Juan Pérez", correo: "juan.perez@colegiorefous.edu.co", saldo: 50000 },
-    { id: "2", nombre: "María García", correo: "maria.garcia@colegiorefous.edu.co", saldo: 30000 },
-    { id: "3", nombre: "Carlos López", correo: "carlos.lopez@colegiorefous.edu.co", saldo: 25000 },
-  ]);
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const [newCliente, setNewCliente] = useState({
     nombre: "",
@@ -25,13 +24,80 @@ const AdminClientes = () => {
     saldo: "0"
   });
 
-  const handleAddCliente = () => {
+  useEffect(() => {
+    loadClientes();
+  }, []);
+
+  const loadClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("tipo_usuario", "cliente");
+
+      if (error) throw error;
+      setClientes(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar clientes: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCliente = async () => {
     if (!newCliente.correo.endsWith("@colegiorefous.edu.co")) {
       toast.error("El correo debe ser institucional (@colegiorefous.edu.co)");
       return;
     }
-    toast.success("Cliente agregado exitosamente");
-    setNewCliente({ nombre: "", correo: "", password: "", saldo: "0" });
+
+    try {
+      // Crear usuario en auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newCliente.correo,
+        password: newCliente.password,
+      });
+
+      if (authError) throw authError;
+
+      // Crear registro en la tabla usuarios
+      const { error: insertError } = await supabase
+        .from("usuarios")
+        .insert({
+          id: authData.user?.id,
+          nombre: newCliente.nombre,
+          correo: newCliente.correo,
+          password_hash: "managed_by_auth",
+          tipo_usuario: "cliente",
+          saldo: parseFloat(newCliente.saldo),
+        });
+
+      if (insertError) throw insertError;
+
+      toast.success("Cliente agregado exitosamente");
+      setNewCliente({ nombre: "", correo: "", password: "", saldo: "0" });
+      setDialogOpen(false);
+      loadClientes();
+    } catch (error: any) {
+      toast.error("Error al agregar cliente: " + error.message);
+    }
+  };
+
+  const handleDeleteCliente = async (id: string) => {
+    if (!confirm("¿Estás seguro de eliminar este cliente?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("usuarios")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Cliente eliminado exitosamente");
+      loadClientes();
+    } catch (error: any) {
+      toast.error("Error al eliminar cliente: " + error.message);
+    }
   };
 
   const filteredClientes = clientes.filter(c => 
@@ -65,7 +131,7 @@ const AdminClientes = () => {
             />
           </div>
           
-          <Dialog>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="hero">
                 <Plus className="h-4 w-4 mr-2" />
@@ -122,29 +188,32 @@ const AdminClientes = () => {
 
         {/* Clientes List */}
         <div className="space-y-4">
-          {filteredClientes.map((cliente) => (
-            <Card key={cliente.id} className="shadow-[var(--shadow-warm)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{cliente.nombre}</h3>
-                    <p className="text-sm text-muted-foreground">{cliente.correo}</p>
-                    <p className="text-lg font-bold text-primary mt-2">
-                      Saldo: ${cliente.saldo.toLocaleString("es-CO")}
-                    </p>
+          {loading ? (
+            <p className="text-center text-muted-foreground">Cargando clientes...</p>
+          ) : filteredClientes.length === 0 ? (
+            <p className="text-center text-muted-foreground">No se encontraron clientes</p>
+          ) : (
+            filteredClientes.map((cliente) => (
+              <Card key={cliente.id} className="shadow-[var(--shadow-warm)]">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{cliente.nombre}</h3>
+                      <p className="text-sm text-muted-foreground">{cliente.correo}</p>
+                      <p className="text-lg font-bold text-primary mt-2">
+                        Saldo: ${cliente.saldo?.toLocaleString("es-CO") || 0}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="destructive" size="icon" onClick={() => handleDeleteCliente(cliente.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="icon">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="destructive" size="icon">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -1,19 +1,64 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, History, LogOut, Store } from "lucide-react";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const ComercioDashboard = () => {
   const navigate = useNavigate();
-  const [saldo] = useState(95000);
-  const [nombre] = useState("Cafetería Escolar");
-  const [codigo] = useState("10001");
+  const [saldo, setSaldo] = useState(0);
+  const [nombre, setNombre] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [comision, setComision] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    loadComercioData();
+  }, []);
+
+  const loadComercioData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/comercio");
+        return;
+      }
+
+      const { data: comercio, error } = await supabase
+        .from("comercios")
+        .select("*")
+        .eq("usuario_id", user.id)
+        .single();
+
+      if (error) throw error;
+
+      setNombre(comercio.nombre);
+      setCodigo(comercio.codigo_comercio);
+      setSaldo(comercio.saldo);
+      setComision(comercio.comision);
+    } catch (error: any) {
+      toast.error(error.message);
+      navigate("/comercio");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/comercio");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/5 to-accent/10 p-4">
@@ -73,7 +118,7 @@ const ComercioDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-secondary">5%</p>
+              <p className="text-3xl font-bold text-secondary">{comision}%</p>
               <p className="text-sm text-muted-foreground mt-1">Por transacción</p>
             </CardContent>
           </Card>

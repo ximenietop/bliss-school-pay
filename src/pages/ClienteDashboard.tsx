@@ -1,18 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, ShoppingCart, History, LogOut } from "lucide-react";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const ClienteDashboard = () => {
   const navigate = useNavigate();
-  const [saldo] = useState(50000);
-  const [nombre] = useState("Juan Pérez");
+  const [saldo, setSaldo] = useState(0);
+  const [nombre, setNombre] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/cliente");
+        return;
+      }
+
+      const { data: usuario, error } = await supabase
+        .from("usuarios")
+        .select("nombre, saldo")
+        .eq("id", user.id)
+        .single();
+
+      if (error) throw error;
+
+      setNombre(usuario.nombre);
+      setSaldo(usuario.saldo);
+    } catch (error: any) {
+      toast.error(error.message);
+      navigate("/cliente");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/cliente");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10 p-4">
