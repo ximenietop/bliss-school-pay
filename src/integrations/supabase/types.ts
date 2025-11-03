@@ -14,7 +14,140 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      comercios: {
+        Row: {
+          codigo_comercio: string
+          comision: number | null
+          created_at: string | null
+          id: string
+          nombre: string
+          saldo: number | null
+          usuario_id: string
+        }
+        Insert: {
+          codigo_comercio: string
+          comision?: number | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+          saldo?: number | null
+          usuario_id: string
+        }
+        Update: {
+          codigo_comercio?: string
+          comision?: number | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          saldo?: number | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comercios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      configuracion: {
+        Row: {
+          created_at: string | null
+          id: string
+          parametro: string
+          valor: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          parametro: string
+          valor: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          parametro?: string
+          valor?: string
+        }
+        Relationships: []
+      }
+      transacciones: {
+        Row: {
+          descripcion: string
+          fecha: string | null
+          id: string
+          id_comercio: string | null
+          id_usuario: string | null
+          monto: number
+          tipo: string
+        }
+        Insert: {
+          descripcion: string
+          fecha?: string | null
+          id?: string
+          id_comercio?: string | null
+          id_usuario?: string | null
+          monto: number
+          tipo: string
+        }
+        Update: {
+          descripcion?: string
+          fecha?: string | null
+          id?: string
+          id_comercio?: string | null
+          id_usuario?: string | null
+          monto?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transacciones_id_comercio_fkey"
+            columns: ["id_comercio"]
+            isOneToOne: false
+            referencedRelation: "comercios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacciones_id_usuario_fkey"
+            columns: ["id_usuario"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usuarios: {
+        Row: {
+          correo: string
+          created_at: string | null
+          id: string
+          nombre: string
+          password_hash: string
+          saldo: number | null
+          tipo_usuario: string
+        }
+        Insert: {
+          correo: string
+          created_at?: string | null
+          id?: string
+          nombre: string
+          password_hash: string
+          saldo?: number | null
+          tipo_usuario: string
+        }
+        Update: {
+          correo?: string
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          password_hash?: string
+          saldo?: number | null
+          tipo_usuario?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
