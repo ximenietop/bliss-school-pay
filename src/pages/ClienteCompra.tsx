@@ -1,27 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const ClienteCompra = () => {
   const navigate = useNavigate();
-  const [codigo, setCodigo] = useState("");
+  const [comercioId, setComercioId] = useState("");
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [comercios, setComercios] = useState<any[]>([]);
+  const [loadingComercios, setLoadingComercios] = useState(true);
 
-  const comerciosValidos = ["10001", "10002"];
+  useEffect(() => {
+    loadComercios();
+  }, []);
+
+  const loadComercios = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("comercios")
+        .select("id, nombre, codigo_comercio")
+        .order("nombre");
+
+      if (error) throw error;
+      setComercios(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar comercios: " + error.message);
+    } finally {
+      setLoadingComercios(false);
+    }
+  };
 
   const handleCompra = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!comerciosValidos.includes(codigo)) {
-      toast.error("Código de comercio no válido");
+    if (!comercioId) {
+      toast.error("Selecciona un comercio");
       return;
     }
 
@@ -62,19 +84,19 @@ const ClienteCompra = () => {
           <CardContent>
             <form onSubmit={handleCompra} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="codigo">Código del Comercio (5 dígitos)</Label>
-                <Input
-                  id="codigo"
-                  type="text"
-                  placeholder="10001"
-                  maxLength={5}
-                  value={codigo}
-                  onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Códigos válidos: 10001 (Cafetería), 10002 (Papelería)
-                </p>
+                <Label htmlFor="comercio">Comercio</Label>
+                <Select value={comercioId} onValueChange={setComercioId} disabled={loadingComercios}>
+                  <SelectTrigger id="comercio">
+                    <SelectValue placeholder={loadingComercios ? "Cargando comercios..." : "Selecciona un comercio"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {comercios.map((comercio) => (
+                      <SelectItem key={comercio.id} value={comercio.id}>
+                        {comercio.nombre} ({comercio.codigo_comercio})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
