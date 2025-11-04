@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,9 +7,38 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Settings } from "lucide-react";
 import { toast } from "sonner";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminConfiguracion = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      toast.error("Debes iniciar sesión");
+      navigate("/admin");
+      return;
+    }
+
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleData) {
+      toast.error("No tienes permisos de administrador");
+      await supabase.auth.signOut();
+      navigate("/admin");
+      return;
+    }
+  };
   const [comisionGlobal, setComisionGlobal] = useState("5");
   const [loading, setLoading] = useState(false);
 

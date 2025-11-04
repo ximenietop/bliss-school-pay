@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +8,38 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ArrowLeft, Store, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminComercios = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      toast.error("Debes iniciar sesión");
+      navigate("/admin");
+      return;
+    }
+
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleData) {
+      toast.error("No tienes permisos de administrador");
+      await supabase.auth.signOut();
+      navigate("/admin");
+      return;
+    }
+  };
   const [comercios, setComercios] = useState([
     { id: "1", nombre: "Cafetería Escolar", codigo: "10001", comision: 5, saldo: 95000 },
     { id: "2", nombre: "Papelería CRF", codigo: "10002", comision: 5, saldo: 45000 },

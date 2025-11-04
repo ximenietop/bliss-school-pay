@@ -25,8 +25,34 @@ const AdminClientes = () => {
   });
 
   useEffect(() => {
-    loadClientes();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      toast.error("Debes iniciar sesión");
+      navigate("/admin");
+      return;
+    }
+
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleData) {
+      toast.error("No tienes permisos de administrador");
+      await supabase.auth.signOut();
+      navigate("/admin");
+      return;
+    }
+
+    loadClientes();
+  };
 
   const loadClientes = async () => {
     try {
