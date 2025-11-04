@@ -39,59 +39,126 @@ const AdminComercios = () => {
       navigate("/admin");
       return;
     }
+
+    loadComercios();
   };
-  const [comercios, setComercios] = useState([
-    { id: "1", nombre: "Cafetería Escolar", codigo: "10001", comision: 5, saldo: 95000 },
-    { id: "2", nombre: "Papelería CRF", codigo: "10002", comision: 5, saldo: 45000 },
-  ]);
+
+  const [comercios, setComercios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingComercio, setEditingComercio] = useState<any>(null);
   const [formData, setFormData] = useState({
     nombre: "",
     codigo: "",
     comision: "5",
+    correo: "",
+    password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadComercios = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("comercios")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setComercios(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar comercios: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (editingComercio) {
-      setComercios(comercios.map(c => 
-        c.id === editingComercio.id 
-          ? { ...c, ...formData, comision: parseFloat(formData.comision) }
-          : c
-      ));
-      toast.success("Comercio actualizado exitosamente");
+      try {
+        const { error } = await supabase
+          .from("comercios")
+          .update({
+            nombre: formData.nombre,
+            codigo_comercio: formData.codigo,
+            comision: parseFloat(formData.comision),
+          })
+          .eq("id", editingComercio.id);
+
+        if (error) throw error;
+
+        toast.success("Comercio actualizado exitosamente");
+        loadComercios();
+      } catch (error: any) {
+        toast.error("Error al actualizar: " + error.message);
+      }
     } else {
-      const newComercio = {
-        id: Date.now().toString(),
-        ...formData,
-        comision: parseFloat(formData.comision),
-        saldo: 0
-      };
-      setComercios([...comercios, newComercio]);
-      toast.success("Comercio creado exitosamente");
+      try {
+        const { data, error } = await supabase.functions.invoke('create-comercio', {
+          body: {
+            nombre: formData.nombre,
+            codigo_comercio: formData.codigo,
+            comision: parseFloat(formData.comision),
+            correo: formData.correo,
+            password: formData.password
+          }
+        });
+
+        if (error) throw error;
+
+        if (!data.success) {
+          throw new Error(data.error || "Error al crear comercio");
+        }
+
+        toast.success("Comercio creado exitosamente");
+        loadComercios();
+      } catch (error: any) {
+        toast.error("Error al crear comercio: " + error.message);
+      }
     }
     
     setDialogOpen(false);
     setEditingComercio(null);
-    setFormData({ nombre: "", codigo: "", comision: "5" });
+    setFormData({ nombre: "", codigo: "", comision: "5", correo: "", password: "" });
   };
 
   const handleEdit = (comercio: any) => {
     setEditingComercio(comercio);
     setFormData({
       nombre: comercio.nombre,
-      codigo: comercio.codigo,
+      codigo: comercio.codigo_comercio,
       comision: comercio.comision.toString(),
+      correo: "",
+      password: "",
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setComercios(comercios.filter(c => c.id !== id));
-    toast.success("Comercio eliminado exitosamente");
+  const handleDelete = async (id: string) => {
+    if (!confirm("¿Estás seguro de eliminar este comercio?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("comercios")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Comercio eliminado exitosamente");
+      loadComercios();
+    } catch (error: any) {
+      toast.error("Error al eliminar: " + error.message);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Cargando comercios...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/10 to-secondary/10 p-4">
@@ -112,7 +179,7 @@ const AdminComercios = () => {
             <DialogTrigger asChild>
               <Button variant="hero" onClick={() => {
                 setEditingComercio(null);
-                setFormData({ nombre: "", codigo: "", comision: "5" });
+                setFormData({ nombre: "", codigo: "", comision: "5", correo: "", password: "" });
               }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Comercio
@@ -158,6 +225,33 @@ const AdminComercios = () => {
                     required
                   />
                 </div>
+                {!editingComercio && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="correo">Correo Electrónico</Label>
+                      <Input
+                        id="correo"
+                        type="email"
+                        value={formData.correo}
+                        onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+                        placeholder="comercio@example.com"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Contraseña</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="Mínimo 6 caracteres"
+                        minLength={6}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
                 <Button type="submit" variant="hero" className="w-full">
                   {editingComercio ? "Actualizar" : "Crear"}
                 </Button>
@@ -167,42 +261,49 @@ const AdminComercios = () => {
         </header>
 
         {/* Comercios List */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {comercios.map((comercio) => (
-            <Card key={comercio.id} className="shadow-[var(--shadow-warm)]">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Store className="h-5 w-5 text-secondary" />
-                    {comercio.nombre}
+        {comercios.length === 0 ? (
+          <div className="text-center py-12">
+            <Store className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No hay comercios registrados</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            {comercios.map((comercio) => (
+              <Card key={comercio.id} className="shadow-[var(--shadow-warm)]">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Store className="h-5 w-5 text-secondary" />
+                      {comercio.nombre}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(comercio)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(comercio.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Código:</span>
+                    <span className="font-mono font-bold">{comercio.codigo_comercio}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(comercio)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(comercio.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Comisión:</span>
+                    <span className="font-bold text-secondary">{comercio.comision}%</span>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Código:</span>
-                  <span className="font-mono font-bold">{comercio.codigo}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Comisión:</span>
-                  <span className="font-bold text-secondary">{comercio.comision}%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Saldo:</span>
-                  <span className="font-bold text-primary">${comercio.saldo.toLocaleString("es-CO")}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Saldo:</span>
+                    <span className="font-bold text-primary">${Number(comercio.saldo || 0).toLocaleString("es-CO")}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

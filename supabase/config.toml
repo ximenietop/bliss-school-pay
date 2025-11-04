@@ -6,5 +6,8 @@ verify_jwt = false
 [functions.create-cliente]
 verify_jwt = false
 
+[functions.create-comercio]
+verify_jwt = false
+
 [functions.reset-admin]
 verify_jwt = false
