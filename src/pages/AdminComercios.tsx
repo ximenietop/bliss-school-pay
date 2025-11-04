@@ -45,6 +45,7 @@ const AdminComercios = () => {
 
   const [comercios, setComercios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingComercio, setEditingComercio] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -74,8 +75,12 @@ const AdminComercios = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingComercio) {
-      try {
+    if (submitting) return;
+    
+    setSubmitting(true);
+    
+    try {
+      if (editingComercio) {
         const { error } = await supabase
           .from("comercios")
           .update({
@@ -89,11 +94,7 @@ const AdminComercios = () => {
 
         toast.success("Comercio actualizado exitosamente");
         loadComercios();
-      } catch (error: any) {
-        toast.error("Error al actualizar: " + error.message);
-      }
-    } else {
-      try {
+      } else {
         const { data, error } = await supabase.functions.invoke('create-comercio', {
           body: {
             nombre: formData.nombre,
@@ -112,14 +113,16 @@ const AdminComercios = () => {
 
         toast.success("Comercio creado exitosamente");
         loadComercios();
-      } catch (error: any) {
-        toast.error("Error al crear comercio: " + error.message);
       }
+      
+      setDialogOpen(false);
+      setEditingComercio(null);
+      setFormData({ nombre: "", codigo: "", comision: "5", correo: "", password: "" });
+    } catch (error: any) {
+      toast.error(editingComercio ? "Error al actualizar: " + error.message : "Error al crear comercio: " + error.message);
+    } finally {
+      setSubmitting(false);
     }
-    
-    setDialogOpen(false);
-    setEditingComercio(null);
-    setFormData({ nombre: "", codigo: "", comision: "5", correo: "", password: "" });
   };
 
   const handleEdit = (comercio: any) => {
@@ -252,8 +255,8 @@ const AdminComercios = () => {
                     </div>
                   </>
                 )}
-                <Button type="submit" variant="hero" className="w-full">
-                  {editingComercio ? "Actualizar" : "Crear"}
+                <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
+                  {submitting ? "Procesando..." : editingComercio ? "Actualizar" : "Crear"}
                 </Button>
               </form>
             </DialogContent>
