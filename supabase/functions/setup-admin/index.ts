@@ -55,6 +55,25 @@ Deno.serve(async (req) => {
 
     console.log('No existing admins found, proceeding with creation');
 
+    // Verificar si el email ya existe en auth.users
+    const { data: existingAuthUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingAuthUsers.users?.find(u => u.email === correo);
+
+    let userId: string;
+
+    if (existingUser) {
+      console.log('User already exists in auth.users, cleaning up and recreating:', existingUser.id);
+      
+      // Eliminar el usuario existente para recrearlo limpio
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
+      if (deleteError) {
+        console.error('Error deleting existing user:', deleteError);
+        throw new Error('Error al limpiar usuario existente');
+      }
+      
+      console.log('Existing user deleted, creating new one');
+    }
+
     // Crear usuario en auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: correo,
@@ -74,13 +93,14 @@ Deno.serve(async (req) => {
       throw new Error('No se pudo crear el usuario');
     }
 
-    console.log('Auth user created:', authData.user.id);
+    userId = authData.user.id;
+    console.log('Auth user created:', userId);
 
     // Insertar en tabla usuarios
     const { error: usuarioError } = await supabaseAdmin
       .from('usuarios')
       .insert({
-        id: authData.user.id,
+        id: userId,
         nombre: nombre,
         correo: correo,
         password_hash: 'managed_by_auth',
@@ -91,7 +111,7 @@ Deno.serve(async (req) => {
     if (usuarioError) {
       console.error('Usuario insert error:', usuarioError);
       // Intentar limpiar el usuario de auth si falla
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(userId);
       throw usuarioError;
     }
 
@@ -101,14 +121,14 @@ Deno.serve(async (req) => {
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
-        user_id: authData.user.id,
+        user_id: userId,
         role: 'admin',
       });
 
     if (roleError) {
       console.error('Role insert error:', roleError);
       // Intentar limpiar si falla
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(userId);
       throw roleError;
     }
 
@@ -118,7 +138,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: 'Administrador creado exitosamente',
-        userId: authData.user.id
+        userId: userId
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
