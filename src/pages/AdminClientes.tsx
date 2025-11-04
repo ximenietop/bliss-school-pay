@@ -45,46 +45,22 @@ const AdminClientes = () => {
   };
 
   const handleAddCliente = async () => {
-    if (!newCliente.correo.endsWith("@colegiorefous.edu.co")) {
-      toast.error("El correo debe ser institucional (@colegiorefous.edu.co)");
-      return;
-    }
-
     try {
-      // Crear usuario en auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newCliente.correo,
-        password: newCliente.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`
+      // Llamar a la Edge Function para crear el cliente
+      const { data, error } = await supabase.functions.invoke('create-cliente', {
+        body: {
+          nombre: newCliente.nombre,
+          correo: newCliente.correo,
+          password: newCliente.password,
+          saldo: parseFloat(newCliente.saldo)
         }
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
 
-      // Crear registro en la tabla usuarios
-      const { error: insertError } = await supabase
-        .from("usuarios")
-        .insert({
-          id: authData.user?.id,
-          nombre: newCliente.nombre,
-          correo: newCliente.correo,
-          password_hash: "managed_by_auth",
-          tipo_usuario: "cliente",
-          saldo: parseFloat(newCliente.saldo),
-        });
-
-      if (insertError) throw insertError;
-
-      // Asignar rol de cliente
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: authData.user?.id,
-          role: "cliente",
-        });
-
-      if (roleError) throw roleError;
+      if (!data.success) {
+        throw new Error(data.error || "Error al crear cliente");
+      }
 
       toast.success("Cliente agregado exitosamente");
       setNewCliente({ nombre: "", correo: "", password: "", saldo: "0" });
