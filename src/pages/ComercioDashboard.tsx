@@ -13,6 +13,8 @@ const ComercioDashboard = () => {
   const [nombre, setNombre] = useState("");
   const [codigo, setCodigo] = useState("");
   const [comision, setComision] = useState(0);
+  const [ventasMes, setVentasMes] = useState(0);
+  const [numTransacciones, setNumTransacciones] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,6 +41,25 @@ const ComercioDashboard = () => {
       setCodigo(comercio.codigo_comercio);
       setSaldo(comercio.saldo);
       setComision(comercio.comision);
+
+      // Get current month sales
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+      const { data: transacciones, error: transError } = await supabase
+        .from("transacciones")
+        .select("monto")
+        .eq("id_comercio", comercio.id)
+        .eq("tipo", "compra")
+        .gte("fecha", firstDay)
+        .lte("fecha", lastDay);
+
+      if (transError) throw transError;
+
+      const totalVentas = transacciones?.reduce((sum, t) => sum + Number(t.monto), 0) || 0;
+      setVentasMes(totalVentas);
+      setNumTransacciones(transacciones?.length || 0);
     } catch (error: any) {
       toast.error(error.message);
       navigate("/comercio");
@@ -105,8 +126,8 @@ const ComercioDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-primary">$250,000</p>
-              <p className="text-sm text-muted-foreground mt-1">48 transacciones</p>
+              <p className="text-3xl font-bold text-primary">${ventasMes.toLocaleString("es-CO")}</p>
+              <p className="text-sm text-muted-foreground mt-1">{numTransacciones} transacciones</p>
             </CardContent>
           </Card>
 

@@ -1,11 +1,59 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Store, CreditCard, DollarSign, Settings, History, LogOut } from "lucide-react";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [totalClientes, setTotalClientes] = useState(0);
+  const [totalComercios, setTotalComercios] = useState(0);
+  const [transaccionesHoy, setTransaccionesHoy] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDashboardStats();
+  }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      // Count total clients
+      const { count: clientesCount, error: clientesError } = await supabase
+        .from("usuarios")
+        .select("*", { count: "exact", head: true })
+        .eq("tipo_usuario", "cliente");
+
+      if (clientesError) throw clientesError;
+
+      // Count total comercios
+      const { count: comerciosCount, error: comerciosError } = await supabase
+        .from("comercios")
+        .select("*", { count: "exact", head: true });
+
+      if (comerciosError) throw comerciosError;
+
+      // Count today's transactions
+      const today = new Date().toISOString().split("T")[0];
+      const { count: transaccionesCount, error: transaccionesError } = await supabase
+        .from("transacciones")
+        .select("*", { count: "exact", head: true })
+        .gte("fecha", today)
+        .lt("fecha", `${today}T23:59:59.999Z`);
+
+      if (transaccionesError) throw transaccionesError;
+
+      setTotalClientes(clientesCount || 0);
+      setTotalComercios(comerciosCount || 0);
+      setTransaccionesHoy(transaccionesCount || 0);
+    } catch (error: any) {
+      toast.error("Error al cargar estadísticas: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     navigate("/admin");
@@ -62,6 +110,14 @@ const AdminDashboard = () => {
     }
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Cargando estadísticas...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/10 to-secondary/10 p-4">
       <div className="max-w-7xl mx-auto">
@@ -88,7 +144,7 @@ const AdminDashboard = () => {
               <CardTitle className="text-lg">Total Clientes</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold text-primary">125</p>
+              <p className="text-4xl font-bold text-primary">{totalClientes.toLocaleString("es-CO")}</p>
             </CardContent>
           </Card>
           <Card className="shadow-[var(--shadow-warm)]">
@@ -96,7 +152,7 @@ const AdminDashboard = () => {
               <CardTitle className="text-lg">Comercios Activos</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold text-secondary">12</p>
+              <p className="text-4xl font-bold text-secondary">{totalComercios.toLocaleString("es-CO")}</p>
             </CardContent>
           </Card>
           <Card className="shadow-[var(--shadow-warm)]">
@@ -104,7 +160,7 @@ const AdminDashboard = () => {
               <CardTitle className="text-lg">Transacciones Hoy</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold text-accent-foreground">48</p>
+              <p className="text-4xl font-bold text-accent-foreground">{transaccionesHoy.toLocaleString("es-CO")}</p>
             </CardContent>
           </Card>
         </div>
