@@ -55,6 +55,9 @@ const AdminClientes = () => {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newCliente.correo,
         password: newCliente.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`
+        }
       });
 
       if (authError) throw authError;
