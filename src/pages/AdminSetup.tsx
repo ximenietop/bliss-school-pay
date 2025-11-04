@@ -26,44 +26,20 @@ const AdminSetup = () => {
     setLoading(true);
     
     try {
-      // Crear usuario en auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: correo,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin/dashboard`
+      // Llamar a la Edge Function para crear el administrador
+      const { data, error } = await supabase.functions.invoke('setup-admin', {
+        body: {
+          nombre,
+          correo,
+          password
         }
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
 
-      if (!authData.user) {
-        throw new Error("No se pudo crear el usuario");
+      if (!data.success) {
+        throw new Error(data.error || "Error al crear administrador");
       }
-
-      // Crear registro en la tabla usuarios
-      const { error: insertError } = await supabase
-        .from("usuarios")
-        .insert({
-          id: authData.user.id,
-          nombre: nombre,
-          correo: correo,
-          password_hash: "managed_by_auth",
-          tipo_usuario: "admin",
-          saldo: 0,
-        });
-
-      if (insertError) throw insertError;
-
-      // Asignar rol de admin
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: authData.user.id,
-          role: "admin",
-        });
-
-      if (roleError) throw roleError;
 
       toast.success("Administrador creado exitosamente. Redirigiendo...");
       
