@@ -10,23 +10,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 const AdminSetup = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    nombre: "",
-    correo: "",
-    password: "",
-    confirmPassword: ""
-  });
+  const [nombre, setNombre] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Las contraseñas no coinciden");
-      return;
-    }
-
-    if (formData.password.length < 6) {
+    if (password.length < 6) {
       toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
@@ -36,10 +28,10 @@ const AdminSetup = () => {
     try {
       // Crear usuario en auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.correo,
-        password: formData.password,
+        email: correo,
+        password: password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`
+          emailRedirectTo: `${window.location.origin}/admin/dashboard`
         }
       });
 
@@ -54,8 +46,8 @@ const AdminSetup = () => {
         .from("usuarios")
         .insert({
           id: authData.user.id,
-          nombre: formData.nombre,
-          correo: formData.correo,
+          nombre: nombre,
+          correo: correo,
           password_hash: "managed_by_auth",
           tipo_usuario: "admin",
           saldo: 0,
@@ -73,9 +65,9 @@ const AdminSetup = () => {
 
       if (roleError) throw roleError;
 
-      toast.success("Administrador creado exitosamente");
-      toast.info("Redirigiendo al login...");
+      toast.success("Administrador creado exitosamente. Redirigiendo...");
       
+      // Esperar 2 segundos antes de redirigir
       setTimeout(() => {
         navigate("/admin");
       }, 2000);
@@ -97,7 +89,7 @@ const AdminSetup = () => {
             Configuración Inicial
           </CardTitle>
           <CardDescription>
-            Crea el primer usuario administrador
+            Crea el primer usuario administrador del sistema
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -108,8 +100,8 @@ const AdminSetup = () => {
                 id="nombre"
                 type="text"
                 placeholder="Admin BLISS"
-                value={formData.nombre}
-                onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
                 required
               />
             </div>
@@ -119,8 +111,8 @@ const AdminSetup = () => {
                 id="correo"
                 type="email"
                 placeholder="admin@bliss.com"
-                value={formData.correo}
-                onChange={(e) => setFormData({...formData, correo: e.target.value})}
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
                 required
               />
             </div>
@@ -129,27 +121,15 @@ const AdminSetup = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                required
-                minLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
               />
             </div>
             <Button type="submit" className="w-full" variant="hero" disabled={loading}>
-              {loading ? "Creando..." : "Crear Administrador"}
+              {loading ? "Creando administrador..." : "Crear Administrador"}
             </Button>
           </form>
         </CardContent>
