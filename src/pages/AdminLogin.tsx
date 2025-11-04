@@ -89,6 +89,16 @@ const AdminLogin = () => {
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
           </form>
+          <div className="mt-4 text-center">
+            <p className="text-sm text-muted-foreground mb-2">¿Problemas para iniciar sesión?</p>
+            <Button 
+              variant="link" 
+              onClick={() => navigate("/admin/reset")}
+              className="text-primary"
+            >
+              Resetear sistema admin
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

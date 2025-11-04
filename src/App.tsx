@@ -27,6 +27,7 @@ import AdminPagos from "./pages/AdminPagos";
 import AdminMovimientos from "./pages/AdminMovimientos";
 import AdminConfiguracion from "./pages/AdminConfiguracion";
 import AdminSetup from "./pages/AdminSetup";
+import AdminReset from "./pages/AdminReset";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
           
           {/* Admin Routes */}
           <Route path="/admin/setup" element={<AdminSetup />} />
+          <Route path="/admin/reset" element={<AdminReset />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/clientes" element={<AdminClientes />} />
