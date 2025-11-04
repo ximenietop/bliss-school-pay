@@ -1,38 +1,76 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, TrendingDown, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 import logoShort from "@/assets/bliss-logo-short.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const ClienteMovimientos = () => {
   const navigate = useNavigate();
+  const [movimientos, setMovimientos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const movimientos = [
-    {
-      id: 1,
-      tipo: "compra",
-      comercio: "Cafetería Escolar",
-      monto: 5000,
-      descripcion: "Almuerzo escolar",
-      fecha: "2025-11-01 12:30"
-    },
-    {
-      id: 2,
-      tipo: "recarga",
-      comercio: "Admin BLISS",
-      monto: 50000,
-      descripcion: "Recarga mensual",
-      fecha: "2025-11-01 08:00"
-    },
-    {
-      id: 3,
-      tipo: "compra",
-      comercio: "Papelería El Lápiz",
-      monto: 3500,
-      descripcion: "Cuadernos",
-      fecha: "2025-10-30 14:15"
+  useEffect(() => {
+    loadMovimientos();
+  }, []);
+
+  const loadMovimientos = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/cliente");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("transacciones")
+        .select(`
+          id,
+          tipo,
+          descripcion,
+          monto,
+          fecha,
+          comercios (
+            nombre
+          )
+        `)
+        .eq("id_usuario", user.id)
+        .order("fecha", { ascending: false });
+
+      if (error) throw error;
+
+      const movimientosFormateados = data.map(t => ({
+        id: t.id,
+        tipo: t.tipo,
+        comercio: t.comercios?.nombre || "Admin BLISS",
+        monto: Number(t.monto),
+        descripcion: t.descripcion,
+        fecha: new Date(t.fecha).toLocaleString("es-CO", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+      }));
+
+      setMovimientos(movimientosFormateados);
+    } catch (error: any) {
+      toast.error("Error al cargar movimientos: " + error.message);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10 p-4 flex items-center justify-center">
+        <p className="text-muted-foreground">Cargando movimientos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10 p-4">
@@ -49,7 +87,14 @@ const ClienteMovimientos = () => {
         </header>
 
         {/* Movimientos List */}
-        <div className="space-y-4">
+        {movimientos.length === 0 ? (
+          <Card className="shadow-[var(--shadow-warm)]">
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No tienes movimientos aún
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
           {movimientos.map((mov) => (
             <Card key={mov.id} className="shadow-[var(--shadow-warm)]">
               <CardContent className="p-6">
@@ -90,7 +135,8 @@ const ClienteMovimientos = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
