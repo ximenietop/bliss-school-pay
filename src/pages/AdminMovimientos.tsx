@@ -41,59 +41,53 @@ const AdminMovimientos = () => {
   };
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
+  const [transacciones, setTransacciones] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const transacciones = [
-    {
-      id: 1,
-      tipo: "compra",
-      usuario: "Juan Pérez",
-      comercio: "Cafetería Escolar",
-      monto: 5000,
-      comision: 250,
-      descripcion: "Almuerzo escolar",
-      fecha: "2025-11-01 12:30"
-    },
-    {
-      id: 2,
-      tipo: "recarga",
-      usuario: "María García",
-      comercio: null,
-      monto: 50000,
-      comision: 0,
-      descripcion: "Recarga mensual",
-      fecha: "2025-11-01 10:00"
-    },
-    {
-      id: 3,
-      tipo: "pago",
-      usuario: null,
-      comercio: "Cafetería Escolar",
-      monto: 50000,
-      comision: 0,
-      descripcion: "Retiro quincenal",
-      fecha: "2025-10-31 16:00"
-    },
-    {
-      id: 4,
-      tipo: "compra",
-      usuario: "Carlos López",
-      comercio: "Papelería CRF",
-      monto: 3500,
-      comision: 175,
-      descripcion: "Material escolar",
-      fecha: "2025-10-30 14:20"
-    },
-    {
-      id: 5,
-      tipo: "recarga",
-      usuario: "Juan Pérez",
-      comercio: null,
-      monto: 30000,
-      comision: 0,
-      descripcion: "Recarga semanal",
-      fecha: "2025-10-29 09:15"
+  useEffect(() => {
+    loadTransacciones();
+  }, []);
+
+  const loadTransacciones = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("transacciones")
+        .select(`
+          *,
+          usuarios!transacciones_id_usuario_fkey(nombre),
+          comercios!transacciones_id_comercio_fkey(nombre, comision)
+        `)
+        .order("fecha", { ascending: false });
+
+      if (error) throw error;
+
+      // Formatear datos para mostrar
+      const formattedData = (data || []).map((trans: any) => ({
+        id: trans.id,
+        tipo: trans.tipo,
+        usuario: trans.usuarios?.nombre || null,
+        comercio: trans.comercios?.nombre || null,
+        monto: parseFloat(trans.monto),
+        comision: trans.tipo === "compra" && trans.comercios?.comision 
+          ? (parseFloat(trans.monto) * parseFloat(trans.comercios.comision) / 100)
+          : 0,
+        descripcion: trans.descripcion,
+        fecha: new Date(trans.fecha).toLocaleString("es-CO", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+      }));
+
+      setTransacciones(formattedData);
+    } catch (error: any) {
+      toast.error("Error al cargar transacciones: " + error.message);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const filteredTransacciones = transacciones.filter(trans => {
     const matchTipo = filtroTipo === "todos" || trans.tipo === filtroTipo;
@@ -170,8 +164,15 @@ const AdminMovimientos = () => {
         </div>
 
         {/* Transacciones List */}
-        <div className="space-y-4">
-          {filteredTransacciones.map((trans) => (
+        {loading ? (
+          <Card className="shadow-[var(--shadow-warm)]">
+            <CardContent className="p-12 text-center">
+              <p className="text-muted-foreground">Cargando transacciones...</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {filteredTransacciones.map((trans) => (
             <Card key={trans.id} className="shadow-[var(--shadow-warm)]">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
@@ -208,10 +209,11 @@ const AdminMovimientos = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {filteredTransacciones.length === 0 && (
+        {!loading && filteredTransacciones.length === 0 && (
           <Card className="shadow-[var(--shadow-warm)]">
             <CardContent className="p-12 text-center">
               <p className="text-muted-foreground">No se encontraron transacciones</p>
