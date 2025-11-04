@@ -44,13 +44,51 @@ const AdminPagos = () => {
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [comercios, setComercios] = useState<any[]>([]);
+  const [loadingComercios, setLoadingComercios] = useState(true);
+  const [pagos, setPagos] = useState<any[]>([]);
 
-  const comercios = [
-    { id: "1", nombre: "Cafetería Escolar", codigo: "10001", saldo: 95000 },
-    { id: "2", nombre: "Papelería CRF", codigo: "10002", saldo: 45000 },
-  ];
+  useEffect(() => {
+    loadComercios();
+    loadPagos();
+  }, []);
 
-  const handlePago = (e: React.FormEvent) => {
+  const loadComercios = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("comercios")
+        .select("*")
+        .order("nombre", { ascending: true });
+
+      if (error) throw error;
+      setComercios(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar comercios: " + error.message);
+    } finally {
+      setLoadingComercios(false);
+    }
+  };
+
+  const loadPagos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("transacciones")
+        .select(`
+          *,
+          comercios!transacciones_id_comercio_fkey(nombre)
+        `)
+        .eq("tipo", "pago")
+        .order("fecha", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      setPagos(data || []);
+    } catch (error: any) {
+      console.error("Error al cargar pagos:", error);
+    }
+  };
+
+  const handlePago = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!comercioId) {
@@ -66,20 +104,56 @@ const AdminPagos = () => {
       return;
     }
 
-    if (comercio && montoNum > comercio.saldo) {
+    if (comercio && montoNum > parseFloat(comercio.saldo?.toString() || "0")) {
       toast.error("El monto excede el saldo disponible del comercio");
       return;
     }
 
     setLoading(true);
     
-    setTimeout(() => {
+    try {
+      // Obtener saldo actual del comercio
+      const { data: comercioData, error: comercioError } = await supabase
+        .from("comercios")
+        .select("saldo")
+        .eq("id", comercioId)
+        .single();
+
+      if (comercioError) throw comercioError;
+
+      const nuevoSaldo = parseFloat(comercioData.saldo?.toString() || "0") - montoNum;
+
+      // Actualizar saldo del comercio
+      const { error: updateError } = await supabase
+        .from("comercios")
+        .update({ saldo: nuevoSaldo })
+        .eq("id", comercioId);
+
+      if (updateError) throw updateError;
+
+      // Registrar transacción
+      const { error: transaccionError } = await supabase
+        .from("transacciones")
+        .insert({
+          tipo: "pago",
+          id_comercio: comercioId,
+          monto: montoNum,
+          descripcion: descripcion
+        });
+
+      if (transaccionError) throw transaccionError;
+
       toast.success("Pago realizado exitosamente");
       setComercioId("");
       setMonto("");
       setDescripcion("");
+      loadComercios();
+      loadPagos();
+    } catch (error: any) {
+      toast.error("Error al realizar pago: " + error.message);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -113,11 +187,17 @@ const AdminPagos = () => {
                     <SelectValue placeholder="Seleccionar comercio..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {comercios.map((comercio) => (
-                      <SelectItem key={comercio.id} value={comercio.id}>
-                        {comercio.nombre} - Saldo: ${comercio.saldo.toLocaleString("es-CO")}
-                      </SelectItem>
-                    ))}
+                    {loadingComercios ? (
+                      <SelectItem value="loading" disabled>Cargando...</SelectItem>
+                    ) : comercios.length === 0 ? (
+                      <SelectItem value="empty" disabled>No hay comercios</SelectItem>
+                    ) : (
+                      comercios.map((comercio) => (
+                        <SelectItem key={comercio.id} value={comercio.id}>
+                          {comercio.nombre} - Saldo: ${parseFloat(comercio.saldo?.toString() || "0").toLocaleString("es-CO")}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -135,7 +215,7 @@ const AdminPagos = () => {
                 />
                 {comercioId && (
                   <p className="text-xs text-muted-foreground">
-                    Saldo disponible: ${comercios.find(c => c.id === comercioId)?.saldo.toLocaleString("es-CO")}
+                    Saldo disponible: ${parseFloat(comercios.find(c => c.id === comercioId)?.saldo?.toString() || "0").toLocaleString("es-CO")}
                   </p>
                 )}
               </div>
@@ -175,22 +255,23 @@ const AdminPagos = () => {
             <CardTitle className="text-lg">Pagos Recientes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-destructive/10 rounded-lg">
-                <div>
-                  <p className="font-medium">Cafetería Escolar</p>
-                  <p className="text-xs text-muted-foreground">Retiro quincenal</p>
-                </div>
-                <p className="font-bold text-destructive">-$50,000</p>
+            {pagos.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay pagos recientes</p>
+            ) : (
+              <div className="space-y-3">
+                {pagos.map((pago) => (
+                  <div key={pago.id} className="flex justify-between items-center p-3 bg-destructive/10 rounded-lg">
+                    <div>
+                      <p className="font-medium">{pago.comercios?.nombre || "Comercio"}</p>
+                      <p className="text-xs text-muted-foreground">{pago.descripcion}</p>
+                    </div>
+                    <p className="font-bold text-destructive">
+                      -${parseFloat(pago.monto).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between items-center p-3 bg-destructive/10 rounded-lg">
-                <div>
-                  <p className="font-medium">Papelería CRF</p>
-                  <p className="text-xs text-muted-foreground">Retiro mensual</p>
-                </div>
-                <p className="font-bold text-destructive">-$35,000</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
