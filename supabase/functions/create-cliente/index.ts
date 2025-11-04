@@ -41,12 +41,40 @@ Deno.serve(async (req) => {
       }
     );
 
-    // Verificar si el email ya existe
+    // Verificar si el email ya existe en auth.users
     const { data: existingAuthUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingAuthUsers.users?.find(u => u.email === correo);
+    const existingAuthUser = existingAuthUsers.users?.find(u => u.email === correo);
 
-    if (existingUser) {
-      throw new Error('Ya existe un usuario con este correo electrónico');
+    if (existingAuthUser) {
+      console.log('User exists in auth.users, checking usuarios table:', existingAuthUser.id);
+      
+      // Verificar si existe en la tabla usuarios
+      const { data: existingUsuario, error: checkError } = await supabaseAdmin
+        .from('usuarios')
+        .select('id')
+        .eq('id', existingAuthUser.id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking usuarios table:', checkError);
+        throw new Error('Error al verificar usuario existente');
+      }
+
+      if (existingUsuario) {
+        // El usuario existe completo, no se puede recrear
+        throw new Error('Ya existe un usuario con este correo electrónico');
+      }
+
+      // El usuario existe en auth pero no en usuarios (corrupto), limpiarlo
+      console.log('User exists in auth but not in usuarios, cleaning up:', existingAuthUser.id);
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(existingAuthUser.id);
+      
+      if (deleteError) {
+        console.error('Error deleting corrupted user:', deleteError);
+        throw new Error('Error al limpiar usuario corrupto');
+      }
+
+      console.log('Corrupted user deleted, proceeding with creation');
     }
 
     // Crear usuario en auth
