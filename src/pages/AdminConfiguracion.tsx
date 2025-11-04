@@ -72,14 +72,19 @@ const AdminConfiguracion = () => {
     
     const { error } = await supabase
       .from("configuracion")
-      .update({ valor: comisionGlobal })
-      .eq("parametro", "porcentaje_comision");
+      .upsert({ 
+        parametro: "porcentaje_comision",
+        valor: comisionGlobal 
+      }, {
+        onConflict: "parametro"
+      });
 
     if (error) {
       toast.error("Error al guardar la configuración");
       console.error(error);
     } else {
       toast.success("Configuración guardada exitosamente");
+      await loadConfiguracion(); // Recargar para confirmar
     }
     
     setLoading(false);
@@ -119,10 +124,11 @@ const AdminConfiguracion = () => {
                   type="number"
                   min="0"
                   max="100"
-                  step="0.1"
+                  step="0.01"
                   value={comisionGlobal}
-                  onChange={(e) => setComisionGlobal(e.target.value)}
+                  onChange={(e) => setComisionGlobal(e.target.value.replace(',', '.'))}
                   required
+                  placeholder="Ej: 3.75"
                 />
                 <p className="text-xs text-muted-foreground">
                   Este porcentaje se aplicará a todas las ventas de los comercios afiliados
