@@ -181,6 +181,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      procesar_compra: {
+        Args: {
+          p_descripcion: string
+          p_id_comercio: string
+          p_id_usuario: string
+          p_monto: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "cliente" | "comercio"

@@ -55,72 +55,28 @@ const ClienteCompra = () => {
     setLoading(true);
     
     try {
-      // 1. Obtener el usuario actual
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
       
-      // 2. Obtener el saldo actual del usuario
-      const { data: usuario, error: userError } = await supabase
-        .from("usuarios")
-        .select("saldo")
-        .eq("id", user.id)
-        .single();
-      
-      if (userError) throw userError;
-      
       const montoCompra = parseFloat(monto);
       
-      // 3. Verificar que tenga saldo suficiente
-      if (usuario.saldo < montoCompra) {
-        toast.error("Saldo insuficiente");
+      // Llamar a la función segura de base de datos
+      const { data, error } = await supabase.rpc('procesar_compra', {
+        p_id_usuario: user.id,
+        p_id_comercio: comercioId,
+        p_monto: montoCompra,
+        p_descripcion: descripcion
+      });
+      
+      if (error) throw error;
+      
+      const result = data as { success: boolean; error?: string };
+      
+      if (!result.success) {
+        toast.error(result.error || "Error al procesar la compra");
         setLoading(false);
         return;
       }
-      
-      // 4. Crear la transacción
-      const { error: transaccionError } = await supabase
-        .from("transacciones")
-        .insert({
-          tipo: "compra",
-          descripcion: descripcion,
-          id_usuario: user.id,
-          id_comercio: comercioId,
-          monto: montoCompra
-        });
-      
-      if (transaccionError) throw transaccionError;
-      
-      // 5. Actualizar el saldo del usuario (restar)
-      const nuevoSaldoUsuario = usuario.saldo - montoCompra;
-      const { error: updateUserError } = await supabase
-        .from("usuarios")
-        .update({ saldo: nuevoSaldoUsuario })
-        .eq("id", user.id);
-      
-      if (updateUserError) throw updateUserError;
-      
-      // 6. Obtener el comercio y actualizar su saldo
-      const { data: comercio, error: comercioError } = await supabase
-        .from("comercios")
-        .select("saldo, comision")
-        .eq("id", comercioId)
-        .single();
-      
-      if (comercioError) throw comercioError;
-      
-      // Calcular comisión (por defecto 5%)
-      const comision = comercio.comision || 5;
-      const montoComision = (montoCompra * comision) / 100;
-      const montoParaComercio = montoCompra - montoComision;
-      
-      // 7. Actualizar el saldo del comercio (sumar monto menos comisión)
-      const nuevoSaldoComercio = comercio.saldo + montoParaComercio;
-      const { error: updateComercioError } = await supabase
-        .from("comercios")
-        .update({ saldo: nuevoSaldoComercio })
-        .eq("id", comercioId);
-      
-      if (updateComercioError) throw updateComercioError;
       
       toast.success("¡Compra realizada exitosamente!");
       navigate("/cliente/dashboard");
