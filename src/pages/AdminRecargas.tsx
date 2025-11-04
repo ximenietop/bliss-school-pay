@@ -44,14 +44,52 @@ const AdminRecargas = () => {
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(true);
+  const [recargas, setRecargas] = useState<any[]>([]);
 
-  const clientes = [
-    { id: "1", nombre: "Juan Pérez", correo: "juan.perez@colegiorefous.edu.co" },
-    { id: "2", nombre: "María García", correo: "maria.garcia@colegiorefous.edu.co" },
-    { id: "3", nombre: "Carlos López", correo: "carlos.lopez@colegiorefous.edu.co" },
-  ];
+  useEffect(() => {
+    loadClientes();
+    loadRecargas();
+  }, []);
 
-  const handleRecarga = (e: React.FormEvent) => {
+  const loadClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("tipo_usuario", "cliente")
+        .order("nombre", { ascending: true });
+
+      if (error) throw error;
+      setClientes(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar clientes: " + error.message);
+    } finally {
+      setLoadingClientes(false);
+    }
+  };
+
+  const loadRecargas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("transacciones")
+        .select(`
+          *,
+          usuarios!transacciones_id_usuario_fkey(nombre)
+        `)
+        .eq("tipo", "recarga")
+        .order("fecha", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      setRecargas(data || []);
+    } catch (error: any) {
+      console.error("Error al cargar recargas:", error);
+    }
+  };
+
+  const handleRecarga = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!clienteId) {
@@ -66,13 +104,48 @@ const AdminRecargas = () => {
 
     setLoading(true);
     
-    setTimeout(() => {
+    try {
+      // Obtener saldo actual del cliente
+      const { data: clienteData, error: clienteError } = await supabase
+        .from("usuarios")
+        .select("saldo")
+        .eq("id", clienteId)
+        .single();
+
+      if (clienteError) throw clienteError;
+
+      const nuevoSaldo = parseFloat(clienteData.saldo?.toString() || "0") + parseFloat(monto);
+
+      // Actualizar saldo del cliente
+      const { error: updateError } = await supabase
+        .from("usuarios")
+        .update({ saldo: nuevoSaldo })
+        .eq("id", clienteId);
+
+      if (updateError) throw updateError;
+
+      // Registrar transacción
+      const { error: transaccionError } = await supabase
+        .from("transacciones")
+        .insert({
+          tipo: "recarga",
+          id_usuario: clienteId,
+          monto: parseFloat(monto),
+          descripcion: descripcion
+        });
+
+      if (transaccionError) throw transaccionError;
+
       toast.success("Recarga realizada exitosamente");
       setClienteId("");
       setMonto("");
       setDescripcion("");
+      loadRecargas();
+    } catch (error: any) {
+      toast.error("Error al realizar recarga: " + error.message);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -166,22 +239,23 @@ const AdminRecargas = () => {
             <CardTitle className="text-lg">Recargas Recientes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-accent/10 rounded-lg">
-                <div>
-                  <p className="font-medium">Juan Pérez</p>
-                  <p className="text-xs text-muted-foreground">Recarga mensual</p>
-                </div>
-                <p className="font-bold text-accent-foreground">+$50,000</p>
+            {recargas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay recargas recientes</p>
+            ) : (
+              <div className="space-y-3">
+                {recargas.map((recarga) => (
+                  <div key={recarga.id} className="flex justify-between items-center p-3 bg-accent/10 rounded-lg">
+                    <div>
+                      <p className="font-medium">{recarga.usuarios?.nombre || "Cliente"}</p>
+                      <p className="text-xs text-muted-foreground">{recarga.descripcion}</p>
+                    </div>
+                    <p className="font-bold text-accent-foreground">
+                      +${parseFloat(recarga.monto).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between items-center p-3 bg-accent/10 rounded-lg">
-                <div>
-                  <p className="font-medium">María García</p>
-                  <p className="text-xs text-muted-foreground">Recarga semanal</p>
-                </div>
-                <p className="font-bold text-accent-foreground">+$30,000</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
