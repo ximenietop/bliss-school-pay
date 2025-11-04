@@ -42,7 +42,23 @@ const AdminConfiguracion = () => {
   const [comisionGlobal, setComisionGlobal] = useState("5");
   const [loading, setLoading] = useState(false);
 
-  const handleGuardar = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadConfiguracion();
+  }, []);
+
+  const loadConfiguracion = async () => {
+    const { data, error } = await supabase
+      .from("configuracion")
+      .select("valor")
+      .eq("parametro", "porcentaje_comision")
+      .maybeSingle();
+
+    if (data) {
+      setComisionGlobal(data.valor);
+    }
+  };
+
+  const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const comision = parseFloat(comisionGlobal);
@@ -54,10 +70,19 @@ const AdminConfiguracion = () => {
 
     setLoading(true);
     
-    setTimeout(() => {
+    const { error } = await supabase
+      .from("configuracion")
+      .update({ valor: comisionGlobal })
+      .eq("parametro", "porcentaje_comision");
+
+    if (error) {
+      toast.error("Error al guardar la configuración");
+      console.error(error);
+    } else {
       toast.success("Configuración guardada exitosamente");
-      setLoading(false);
-    }, 1000);
+    }
+    
+    setLoading(false);
   };
 
   return (
